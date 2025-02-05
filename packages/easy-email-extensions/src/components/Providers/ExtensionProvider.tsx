@@ -3,6 +3,7 @@ import { isEqual, omit } from 'lodash';
 import React, { useContext, useMemo, useRef } from 'react';
 
 export interface ExtensionProps extends BlockLayerProps {
+  children?: React.ReactNode | React.ReactElement;
   categories: Array<
     | {
         label: string;
@@ -39,7 +40,10 @@ export interface ExtensionProps extends BlockLayerProps {
       }
   >;
   showSourceCode?: boolean;
+  jsonReadOnly?: boolean;
+  mjmlReadOnly?: boolean;
   compact?: boolean;
+  showBlockLayer?: boolean;
 }
 
 export const ExtensionContext = React.createContext<ExtensionProps>({

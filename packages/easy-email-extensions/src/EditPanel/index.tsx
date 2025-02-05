@@ -10,9 +10,17 @@ import { useExtensionProps } from '@extensions/components/Providers/ExtensionPro
 
 const TabPane = Tabs.TabPane;
 
-export function EditPanel({ showSourceCode }: { showSourceCode: boolean }) {
+export function EditPanel({
+  showSourceCode,
+  jsonReadOnly,
+  mjmlReadOnly,
+}: {
+  showSourceCode: boolean;
+  jsonReadOnly: boolean;
+  mjmlReadOnly: boolean;
+}) {
   const { height } = useEditorProps();
-  const { compact = true } = useExtensionProps();
+  const { compact = true, showBlockLayer = true } = useExtensionProps();
 
   return (
     <Layout.Sider
@@ -43,22 +51,26 @@ export function EditPanel({ showSourceCode }: { showSourceCode: boolean }) {
           </FullHeightOverlayScrollbars>
         </TabPane>
 
-        <TabPane
-          key='1'
-          title={t('Layer')}
-        >
-          <FullHeightOverlayScrollbars height={`calc(${height} - 60px)`}>
-            <div style={{ padding: 20 }}>
-              <BlockLayer />
-            </div>
-          </FullHeightOverlayScrollbars>
-        </TabPane>
+        {showBlockLayer && (
+          <TabPane
+            key='1'
+            title={t('Layer')}
+          >
+            <FullHeightOverlayScrollbars height={`calc(${height} - 60px)`}>
+              <div style={{ padding: 20 }}>
+                <BlockLayer />
+              </div>
+            </FullHeightOverlayScrollbars>
+          </TabPane>
+        )}
       </Tabs>
       {!compact && (
         <ConfigurationDrawer
           height={height}
           showSourceCode={showSourceCode}
           compact={Boolean(compact)}
+          jsonReadOnly={jsonReadOnly}
+          mjmlReadOnly={mjmlReadOnly}
         />
       )}
     </Layout.Sider>

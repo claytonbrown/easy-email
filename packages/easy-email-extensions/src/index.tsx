@@ -11,7 +11,9 @@ export * from './MergeTagBadgePrompt';
 export * from './components/Providers/ExtensionProvider';
 export * from './constants';
 export * from './components/Form';
+export * from './components/ShadowDom';
 
 export { getContextMergeTags } from './utils/getContextMergeTags';
-export { getIconNameByBlockType } from './utils/getIconNameByBlockType';
+export { getIconNameByBlockType, setIconsMap } from './utils/getIconNameByBlockType';
 export { getBlockTitle } from './utils/getBlockTitle';
+export { MjmlToJson } from './utils/MjmlToJson';

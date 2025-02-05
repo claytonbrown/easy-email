@@ -1,58 +1,49 @@
 /* eslint-disable react/jsx-wrap-multilines */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import template from '@demo/store/template';
 import { useAppSelector } from '@demo/hooks/useAppSelector';
 import { useLoading } from '@demo/hooks/useLoading';
-import { Button, Message, PageHeader, Select } from '@arco-design/web-react';
+import {
+  Button,
+  ConfigProvider,
+  Dropdown,
+  Menu,
+  Message,
+  PageHeader,
+  Select,
+} from '@arco-design/web-react';
 import { useQuery } from '@demo/hooks/useQuery';
 import { useHistory } from 'react-router-dom';
-import { cloneDeep, set, isEqual } from 'lodash';
+import { cloneDeep } from 'lodash';
 import { Loading } from '@demo/components/loading';
 import mjml from 'mjml-browser';
-import { copy } from '@demo/utils/clipboard';
-import { useEmailModal } from './components/useEmailModal';
 import services from '@demo/services';
-import { IconMoonFill, IconSunFill } from '@arco-design/web-react/icon';
-import { Liquid } from 'liquidjs';
+import { saveAs } from 'file-saver';
 import {
   BlockAvatarWrapper,
   EmailEditor,
   EmailEditorProvider,
-  EmailEditorProviderProps,
   IEmailTemplate,
 } from 'easy-email-editor';
 
 import { Stack } from '@demo/components/Stack';
 import { pushEvent } from '@demo/utils/pushEvent';
-import { FormApi } from 'final-form';
 import { UserStorage } from '@demo/utils/user-storage';
 
-import { useCollection } from './components/useCollection';
-import { AdvancedType, BasicType, IBlockData, JsonToMjml } from 'easy-email-core';
-import {
-  BlockMarketManager,
-  ExtensionProps,
-  StandardLayout,
-} from 'easy-email-extensions';
+import { AdvancedType, IBlockData, JsonToMjml } from 'easy-email-core';
+import { ExtensionProps, StandardLayout } from 'easy-email-extensions';
 import { AutoSaveAndRestoreEmail } from '@demo/components/AutoSaveAndRestoreEmail';
-
-// Register external blocks
-import './components/CustomBlocks';
 
 import 'easy-email-editor/lib/style.css';
 import 'easy-email-extensions/lib/style.css';
 import blueTheme from '@arco-themes/react-easy-email-theme/css/arco.css?inline';
-import purpleTheme from '@arco-themes/react-easy-email-theme-purple/css/arco.css?inline';
-import greenTheme from '@arco-themes/react-easy-email-theme-green/css/arco.css?inline';
-import { testMergeTags } from './testMergeTags';
-import { useMergeTagsModal } from './components/useMergeTagsModal';
 
+import { Uploader } from '@demo/utils/Uploader';
+import enUS from '@arco-design/web-react/es/locale/en-US';
+
+import { useShowCommercialEditor } from '@demo/hooks/useShowCommercialEditor';
 import { useWindowSize } from 'react-use';
-import { CustomBlocksType } from './components/CustomBlocks/constants';
-import localesData from 'easy-email-localization/locales/locales.json';
-
-console.log(localesData);
 
 const defaultCategories: ExtensionProps['categories'] = [
   {
@@ -64,7 +55,6 @@ const defaultCategories: ExtensionProps['categories'] = [
       },
       {
         type: AdvancedType.IMAGE,
-        payload: { attributes: { padding: '0px 0px 0px 0px' } },
       },
       {
         type: AdvancedType.BUTTON,
@@ -83,6 +73,9 @@ const defaultCategories: ExtensionProps['categories'] = [
       },
       {
         type: AdvancedType.WRAPPER,
+      },
+      {
+        type: AdvancedType.TABLE,
       },
     ],
   },
@@ -115,103 +108,17 @@ const defaultCategories: ExtensionProps['categories'] = [
       },
     ],
   },
-  {
-    label: 'Custom',
-    active: true,
-    displayType: 'custom',
-    blocks: [
-      <BlockAvatarWrapper type={CustomBlocksType.PRODUCT_RECOMMENDATION}>
-        <div
-          style={{
-            position: 'relative',
-            border: '1px solid #ccc',
-            marginBottom: 20,
-            width: '80%',
-            marginLeft: 'auto',
-            marginRight: 'auto',
-          }}
-        >
-          <img
-            src={
-              'http://res.cloudinary.com/dwkp0e1yo/image/upload/v1665841389/ctbjtig27parugrztdhk.png'
-            }
-            style={{
-              maxWidth: '100%',
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: 2,
-            }}
-          />
-        </div>
-      </BlockAvatarWrapper>,
-    ],
-  },
 ];
 
-const imageCompression = import('browser-image-compression');
-
-const fontList = [
-  'Arial',
-  'Tahoma',
-  'Verdana',
-  'Times New Roman',
-  'Courier New',
-  'Georgia',
-  'Lato',
-  'Montserrat',
-  '黑体',
-  '仿宋',
-  '楷体',
-  '标楷体',
-  '华文仿宋',
-  '华文楷体',
-  '宋体',
-  '微软雅黑',
-].map(item => ({ value: item, label: item }));
-
 export default function Editor() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [theme, setTheme] = useState<'blue' | 'green' | 'purple'>('blue');
+  const { featureEnabled } = useShowCommercialEditor();
   const dispatch = useDispatch();
   const history = useHistory();
   const templateData = useAppSelector('template');
-  const [locale, setLocale] = useState('zh-Hans');
-  const { addCollection, removeCollection, collectionCategory } = useCollection();
-
   const { width } = useWindowSize();
-
-  const smallScene = width < 1400;
-
-  const { openModal, modal } = useEmailModal();
+  const compact = width > 1600;
   const { id, userId } = useQuery();
   const loading = useLoading(template.loadings.fetchById);
-  const {
-    modal: mergeTagsModal,
-    openModal: openMergeTagsModal,
-    mergeTags,
-    setMergeTags,
-  } = useMergeTagsModal(testMergeTags);
-
-  const isSubmitting = useLoading([
-    template.loadings.create,
-    template.loadings.updateById,
-  ]);
-
-  useEffect(() => {
-    if (collectionCategory) {
-      BlockMarketManager.addCategories([collectionCategory]);
-      return () => {
-        BlockMarketManager.removeCategories([collectionCategory]);
-      };
-    }
-  }, [collectionCategory]);
 
   useEffect(() => {
     if (id) {
@@ -231,65 +138,42 @@ export default function Editor() {
     };
   }, [dispatch, id, userId]);
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.body.setAttribute('arco-theme', 'dark');
-    } else {
-      document.body.removeAttribute('arco-theme');
-    }
-  }, [isDarkMode]);
-
   const onUploadImage = async (blob: Blob) => {
-    const compressionFile = await (
-      await imageCompression
-    ).default(blob as File, {
-      maxWidthOrHeight: 1440,
-    });
-    return services.common.uploadByQiniu(compressionFile);
-  };
-
-  const onChangeTheme = useCallback(t => {
-    setTheme(t);
-  }, []);
-
-  const onChangeMergeTag = useCallback((path: string, val: any) => {
-    setMergeTags(old => {
-      const newObj = cloneDeep(old);
-      set(newObj, path, val);
-      return newObj;
-    });
-  }, []);
-
-  const onExportHtml = (values: IEmailTemplate) => {
-    pushEvent({ event: 'HtmlExport' });
-    const html = mjml(
-      JsonToMjml({
-        data: values.content,
-        mode: 'production',
-        context: values.content,
-        dataSource: mergeTags,
-      }),
-      {
-        beautify: true,
-        validationLevel: 'soft',
-      },
-    ).html;
-
-    copy(html);
-    Message.success('Copied to pasteboard!');
+    return services.common.uploadByQiniu(blob);
   };
 
   const onExportMJML = (values: IEmailTemplate) => {
-    const html = JsonToMjml({
+    const mjmlString = JsonToMjml({
       data: values.content,
       mode: 'production',
       context: values.content,
-      dataSource: mergeTags,
     });
 
-    copy(html);
-    pushEvent({ event: 'MJMLExport', payload: { values, mergeTags } });
-    Message.success('Copied to pasteboard!');
+    pushEvent({ event: 'MJMLExport', payload: { values } });
+    navigator.clipboard.writeText(mjmlString);
+    saveAs(new Blob([mjmlString], { type: 'text/mjml' }), 'easy-email.mjml');
+  };
+
+  const onExportHTML = (values: IEmailTemplate) => {
+    const mjmlString = JsonToMjml({
+      data: values.content,
+      mode: 'production',
+      context: values.content,
+    });
+
+    const html = mjml(mjmlString, {}).html;
+
+    pushEvent({ event: 'HTMLExport', payload: { values } });
+    navigator.clipboard.writeText(html);
+    saveAs(new Blob([html], { type: 'text/html' }), 'easy-email.html');
+  };
+
+  const onExportJSON = (values: IEmailTemplate) => {
+    navigator.clipboard.writeText(JSON.stringify(values, null, 2));
+    saveAs(
+      new Blob([JSON.stringify(values, null, 2)], { type: 'application/json' }),
+      'easy-email.json',
+    );
   };
 
   const initialValues: IEmailTemplate | null = useMemo(() => {
@@ -302,63 +186,11 @@ export default function Editor() {
   }, [templateData]);
 
   const onSubmit = useCallback(
-    async (
-      values: IEmailTemplate,
-      form: FormApi<IEmailTemplate, Partial<IEmailTemplate>>,
-    ) => {
-      pushEvent({ event: 'EmailSave' });
-      if (id) {
-        const isChanged = !(
-          isEqual(initialValues?.content, values.content) &&
-          isEqual(initialValues?.subTitle, values?.subTitle) &&
-          isEqual(initialValues?.subject, values?.subject)
-        );
-
-        if (!isChanged) {
-          Message.success('Updated success!');
-          form.restart(values);
-          return;
-        }
-        dispatch(
-          template.actions.updateById({
-            id: +id,
-            template: values,
-            success() {
-              Message.success('Updated success!');
-              form.restart(values);
-            },
-          }),
-        );
-      } else {
-        dispatch(
-          template.actions.create({
-            template: values,
-            success(id, newTemplate) {
-              Message.success('Saved success!');
-              form.restart(newTemplate);
-              history.replace(`/editor?id=${id}`);
-            },
-          }),
-        );
-      }
+    async (values: IEmailTemplate) => {
+      console.log(values);
     },
     [dispatch, history, id, initialValues],
   );
-
-  const onBeforePreview: EmailEditorProviderProps['onBeforePreview'] = useCallback(
-    (html: string, mergeTags) => {
-      const engine = new Liquid();
-      const tpl = engine.parse(html);
-      return engine.renderSync(tpl, mergeTags);
-    },
-    [],
-  );
-
-  const themeStyleText = useMemo(() => {
-    if (theme === 'green') return greenTheme;
-    if (theme === 'purple') return purpleTheme;
-    return blueTheme;
-  }, [theme]);
 
   if (!templateData && loading) {
     return (
@@ -371,147 +203,79 @@ export default function Editor() {
   if (!initialValues) return null;
 
   return (
-    <div>
-      <style>{themeStyleText}</style>
-      <EmailEditorProvider
-        key={id}
-        height={'calc(100vh - 68px)'}
-        data={initialValues}
-        // interactiveStyle={{
-        //   hoverColor: '#78A349',
-        //   selectedColor: '#1890ff',
-        // }}
-        // onAddCollection={addCollection}
-        // onRemoveCollection={({ id }) => removeCollection(id)}
-        onUploadImage={onUploadImage}
-        fontList={fontList}
-        onSubmit={onSubmit}
-        onChangeMergeTag={onChangeMergeTag}
-        autoComplete
-        enabledLogic
-        // enabledMergeTagsBadge
-        dashed={false}
-        mergeTags={mergeTags}
-        mergeTagGenerate={tag => `{{${tag}}}`}
-        onBeforePreview={onBeforePreview}
-        socialIcons={[]}
-        locale={localesData[locale]}
-      >
-        {({ values }, { submit }) => {
-          return (
-            <>
-              <PageHeader
-                style={{ background: 'var(--color-bg-2)' }}
-                backIcon
-                title='Edit'
-                onBack={() => history.push('/')}
-                extra={
-                  <Stack alignment='center'>
-                    <Button
-                      onClick={() => setIsDarkMode(v => !v)}
-                      shape='circle'
-                      type='text'
-                      icon={isDarkMode ? <IconMoonFill /> : <IconSunFill />}
-                    ></Button>
+    <ConfigProvider locale={enUS}>
+      <div>
+        <style>{blueTheme}</style>
+        <EmailEditorProvider
+          height={featureEnabled ? 'calc(100vh - 108px)' : 'calc(100vh - 68px)'}
+          data={initialValues}
+          onUploadImage={onUploadImage}
+          onSubmit={onSubmit}
+          dashed={false}
+          compact={compact}
+        >
+          {({ values }, { submit, restart }) => {
+            return (
+              <>
+                <PageHeader
+                  style={{ background: 'var(--color-bg-2)' }}
+                  backIcon
+                  title='Edit'
+                  onBack={() => history.push('/')}
+                  extra={
+                    <Stack alignment='center'>
+                      <Dropdown
+                        droplist={
+                          <Menu>
+                            <Menu.Item
+                              key='Export MJML'
+                              onClick={() => onExportMJML(values)}
+                            >
+                              Export MJML
+                            </Menu.Item>
+                            <Menu.Item
+                              key='Export HTML'
+                              onClick={() => onExportHTML(values)}
+                            >
+                              Export HTML
+                            </Menu.Item>
+                            <Menu.Item
+                              key='Export JSON'
+                              onClick={() => onExportJSON(values)}
+                            >
+                              Export JSON
+                            </Menu.Item>
+                          </Menu>
+                        }
+                      >
+                        <Button>
+                          <strong>Export</strong>
+                        </Button>
+                      </Dropdown>
+                      <Button
+                        type='primary'
+                        target='_blank'
+                        href='https://demo.easyemail.pro?utm_source=easyemail'
+                      >
+                        Try commercial version
+                      </Button>
+                    </Stack>
+                  }
+                />
 
-                    <Select
-                      onChange={onChangeTheme}
-                      value={theme}
-                    >
-                      <Select.Option value='blue'>Blue</Select.Option>
-                      <Select.Option value='green'>Green</Select.Option>
-                      <Select.Option value='purple'>Purple</Select.Option>
-                    </Select>
-                    <Select
-                      onChange={setLocale}
-                      value={locale}
-                    >
-                      <Select.Option value='en'>English</Select.Option>
-                      <Select.Option value='zh-Hans'>中文简体</Select.Option>
-                      <Select.Option value='ja'>Japanese</Select.Option>
-                      <Select.Option value='it'>Italian</Select.Option>
-                    </Select>
-
-                    <Button onClick={openMergeTagsModal}>Update mergeTags</Button>
-
-                    <Button onClick={() => onExportMJML(values)}>Export MJML</Button>
-
-                    <Button onClick={() => onExportHtml(values)}>Export html</Button>
-
-                    <Button onClick={() => openModal(values, mergeTags)}>
-                      Send test email
-                    </Button>
-                    <Button
-                      loading={isSubmitting}
-                      type='primary'
-                      onClick={() => submit()}
-                    >
-                      Save
-                    </Button>
-                    <a
-                      href='https://www.buymeacoffee.com/easyemail?utm_source=webside&utm_medium=button&utm_content=donate'
-                      target='_blank'
-                      onClick={ev => {
-                        ev.preventDefault();
-                        pushEvent({ event: 'Donate' });
-                        window.open(
-                          'https://www.buymeacoffee.com/easyemail?utm_source=webside&utm_medium=button&utm_content=donate',
-                          '_blank',
-                        );
-                      }}
-                    >
-                      <img
-                        style={{
-                          marginTop: -16,
-                          position: 'relative',
-                          top: 11,
-                          height: 32,
-                        }}
-                        src='https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png'
-                        alt='Buy Me A Coffee'
-                      />
-                    </a>
-                  </Stack>
-                }
-              />
-              <StandardLayout
-                compact={!smallScene}
-                categories={defaultCategories}
-              >
-                <EmailEditor />
-              </StandardLayout>
-              <AutoSaveAndRestoreEmail />
-            </>
-          );
-        }}
-      </EmailEditorProvider>
-      {modal}
-      {mergeTagsModal}
-      <style>{`#bmc-wbtn {display:none !important;}`}</style>
-    </div>
+                <StandardLayout
+                  categories={defaultCategories}
+                  showSourceCode={false}
+                  showBlockLayer={false}
+                >
+                  <EmailEditor />
+                </StandardLayout>
+                <AutoSaveAndRestoreEmail />
+              </>
+            );
+          }}
+        </EmailEditorProvider>
+      </div>
+    </ConfigProvider>
   );
-}
-
-function replaceStandardBlockToAdvancedBlock(blockData: IBlockData) {
-  const map = {
-    [BasicType.TEXT]: AdvancedType.TEXT,
-    [BasicType.BUTTON]: AdvancedType.BUTTON,
-    [BasicType.IMAGE]: AdvancedType.IMAGE,
-    [BasicType.DIVIDER]: AdvancedType.DIVIDER,
-    [BasicType.SPACER]: AdvancedType.SPACER,
-    [BasicType.SOCIAL]: AdvancedType.SOCIAL,
-    [BasicType.ACCORDION]: AdvancedType.ACCORDION,
-    [BasicType.CAROUSEL]: AdvancedType.CAROUSEL,
-    [BasicType.NAVBAR]: AdvancedType.NAVBAR,
-    [BasicType.WRAPPER]: AdvancedType.WRAPPER,
-    [BasicType.SECTION]: AdvancedType.SECTION,
-    [BasicType.GROUP]: AdvancedType.GROUP,
-    [BasicType.COLUMN]: AdvancedType.COLUMN,
-  };
-
-  if (map[blockData.type]) {
-    blockData.type = map[blockData.type];
-  }
-  blockData.children.forEach(replaceStandardBlockToAdvancedBlock);
-  return blockData;
 }
